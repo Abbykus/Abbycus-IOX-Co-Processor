@@ -1,2 +1,2 @@
-# ABBY-IOX-PCB
-Multipurpose I/O expansion board
+# ABBY-IOX
+High speed serial to parallel I/O expansion module 
