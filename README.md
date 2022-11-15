@@ -33,4 +33,5 @@ Call the library initialization function to begin communication. The following e
 Se also the IOX I2C User Manual in the DOCS folder.
 
 **UART:** iox_uart.h and iox_uart.cpp.
+
 **SPI:** iox_spi.h and iox_spi.cpp.
