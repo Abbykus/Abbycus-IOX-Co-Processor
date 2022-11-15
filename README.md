@@ -22,12 +22,14 @@ The IOX module greatly enhances microprocessor I/O capability by using one of th
 
 
 ## Library Installation for I2C bus
-The Abbykus IOX module can be quickly added to a project by adding two files into the project's source folder. Library file names for the different bus versions are as follows:
+The Abbykus IOX module can be quickly added to a project by adding two files into the project's source folder. The library file names for the I2C bus version are as follows:
 **I2C:** iox_i2c.h and iox_i2c.cpp.
+
 The project should reference the library header file using **"#include iox_i2c.h"**.
 Create a library object specifying the I2C library and the I2C bus address **IOX_I2C ioxi2c(0x5D);** Note that the I2C version allows dual addressing such that 2 IOX modules can be connected to the same bus and controlled using two library objects - one with address 0x5D and the other with address 0x5E.
+
 Call the library initialization function to begin communication. The following example works for Arduino / platformIO:
-**iox_i2c.init(PIN_I2C_SDA, PIN_I2C_SCK, 400000U, &Wire);** where PIN_I2C_SDA = pin number for SDA and PIN_I2C_SCK = SCK. Bus speed is determined using a value of 400000U. The Arduino Wire library I2C controller has the name 'Wire'.
+**iox_i2c.init(PIN_I2C_SDA, PIN_I2C_SCK, 400000U, &Wire);** where PIN_I2C_SDA = pin number for SDA and PIN_I2C_SCK = SCK. Bus speed is set using a value of 400000U (I2C fast mode). The Arduino Wire library I2C controller has the name 'Wire'.
 
 **UART:** iox_uart.h and iox_uart.cpp.
 **SPI:** iox_spi.h and iox_spi.cpp.
