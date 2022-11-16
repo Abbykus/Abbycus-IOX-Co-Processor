@@ -1,6 +1,6 @@
 /********************************************************************
  * @file iox_i2c.cpp
- * @author J.Hoeppner @ ABBYKUS
+ * @author J.Hoeppner @ Abbycus
  * @brief 
  * @version 1.0
  * @date 2022-09-26
