@@ -44,8 +44,8 @@ bool IOX_I2C::init(uint8_t sda, uint8_t sck, uint32_t bus_freq, TwoWire *wire)
 
 /********************************************************************
  * @brief Who Am I checks the I2C bus connection. The slave device is 
- *       expected to return a one byte magic number 0x81.
- * @return true if connection is valid.
+ *       expected to return its own I2C address.
+ * @return ERR_NONE if connection is valid.
  */
 uint8_t IOX_I2C::whoAmI(void)   // connection test
 {
@@ -65,9 +65,10 @@ uint8_t IOX_I2C::whoAmI(void)   // connection test
 
 
 /********************************************************************
- * @brief Error Check returns an error code from the last operation.
+ * @brief Read status returns status and any error codes from the last 
+ * operation.
  * 
- * @return -1 if i2c read fails. Else see error codes in iox_i2c.h 
+ * @return ERR_NONE if successful. Else see error codes in iox_i2c.h 
  */
 uint8_t IOX_I2C::read_status(SYS_STATUS *sys_status, uint8_t field_mask)  // connection test
 {
