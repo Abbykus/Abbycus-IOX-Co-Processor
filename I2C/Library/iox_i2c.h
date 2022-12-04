@@ -1,6 +1,6 @@
 /********************************************************************
  * @file iox_i2c.h
- * @author J.Hoeppner @ Abbycus
+ * @author J.Hoeppner @ ABBYKUS
  * @brief 
  * @version 1.0
  * @date 2022-09-26
@@ -17,7 +17,7 @@
 
 /** I2C attributes **/
 #define I2C_SLAVE_ADRS        0x5D           // might be 0x5E if the IOX ADR0 input is pulled high
-#define I2C_MASTER_FREQ_HZ    400000U
+#define I2C_MASTER_FREQ_HZ    400000U        // default I2C bit rate
 
 /** ABBY IOx register definitions **/
 enum reg_nums {
@@ -27,12 +27,11 @@ enum reg_nums {
 	CONFIG_GPIOS,           // set range of I/O's to input or output
 	GET_GPIO_CONFIG,        // get mode of specified gpio
 	WRITE_GPIOS,            // write a range of gpio's with a state bit
-   WRITE_GPIOS_ALL,        // write all gpio's using a 20 bit parallel value.
    TOGGLE_GPIOS,           // toggle one or more gpio's
 	READ_GPIO,              // read state of a single gpio. 
    READ_GPIO_ALL,          // read all gpio's and returns a 20 bit value.
    CONFIG_EXTI_EVENT,      // configure exti event output
-   CONFIG_PWM,				   // configure a PWM output
+   START_PWM,				   // start a PWM output
 	UPDATE_PWM,             // update a PWM output
    CONFIG_ADC,             // config one or more ADC channels
    START_ADC,              // start an ADC conversion sequence
@@ -42,6 +41,40 @@ enum reg_nums {
    CONFIG_ENCODER,         // configure an encoder input
    READ_ENCODER,           // read an encoder 
    SLEEP,                  // enter low power sleep mode
+};
+
+enum gpios {
+   GPIO0 = 0,
+   GPIO1,
+   GPIO2,
+   GPIO3,
+   GPIO4,
+   GPIO5,
+   GPIO6,
+   GPIO7,
+   GPIO8,
+   GPIO9,
+   GPIO10,
+   GPIO11,
+   GPIO12,
+   GPIO13,
+   GPIO14,
+   GPIO15,
+   GPIO16,
+   GPIO17,
+   GPIO18,
+   GPIO19,                                                               
+};
+
+enum encoders {
+   ENC0=0,
+   ENC1,
+   ENC2,
+   ENC3,
+   ENC4,
+   ENC5,
+   ENC6,
+   ENC7,
 };
 
 enum errors {
@@ -166,7 +199,7 @@ enum event_types {
    EVENT_ENCODER,
 };
 
-enum event_nums {
+enum event_outputs {
    EVO0,
    EVO1,
    EVO2,
@@ -177,51 +210,50 @@ enum event_nums {
 /** IOX_I2C class for communication to the IOX I/O expander **/
 class IOX_I2C {
    public:
-      IOX_I2C(uint8_t slave_adr);       // constructor
-      bool init(uint8_t sda, uint8_t sck, uint32_t bus_freq = 100000U, TwoWire *wire = &Wire);
-      uint8_t whoAmI(void);   // connection test
-      uint8_t read_status(SYS_STATUS *sys_status, uint8_t field_mask);
-      uint8_t config_gpios(uint8_t start, uint8_t end, uint8_t io_mode);
-      uint8_t get_gpio_config(uint8_t gpio_num);
+      IOX_I2C(void);       // constructor
+      bool init(uint8_t sda, uint8_t sck, uint32_t bus_freq = 100000U, TwoWire *wire = &Wire1);
+      uint8_t whoAmI(uint8_t iox_adrs);   // connection test
+      uint8_t read_status(uint8_t iox_adrs, SYS_STATUS *sys_status, uint8_t field_mask);
+      uint8_t config_gpios(uint8_t iox_adrs, uint32_t gpio_map, uint8_t io_mode);
+      uint8_t get_gpio_config(uint8_t iox_adrs, uint8_t gpio_num);
 
       /** gpio write operations **/
-      uint8_t write_gpios(uint8_t start, uint8_t end, uint8_t state);    // write range of GPIO's to 0 or 1
-      uint8_t write_gpios_all(uint32_t bits20);       // set all outputs to the state in the 20 bit field
-      uint8_t toggle_gpios(uint8_t start, uint8_t end);  // toggle a range of GPIO's
+      uint8_t write_gpios(uint8_t iox_adrs, uint32_t gpio_map, uint32_t state_map);    // write range of GPIO's to 0 or 1
+      uint8_t toggle_gpios(uint8_t iox_adrs, uint32_t _gpio_map);  // toggle a range of GPIO's
 
       /** gpio read operations **/
-      uint8_t read_gpio(uint8_t gpio, uint8_t *ret_value);
-      uint8_t read_gpio_all(uint32_t * gpio_map);
+      uint8_t read_gpio(uint8_t iox_adrs, uint8_t gpio, uint8_t *ret_value);
+      uint8_t read_gpio_all(uint8_t iox_adrs, uint32_t * gpio_map);
 
       /** external interrupt configuration **/
-      uint8_t config_event_output(uint8_t event_type, uint8_t event_io);
+      uint8_t config_event_output(uint8_t iox_adrs, uint8_t event_type, uint8_t event_io);
 
       /** PWM configuration & update functions **/
-      uint8_t config_PWM(uint8_t pwm_num, uint16_t clk_div, uint16_t pwm_freq, uint16_t pwm_duty, bool polarity);
-      uint8_t update_PWM(uint8_t pwm_num, uint16_t pwm_duty);
+      uint8_t start_PWM(uint8_t iox_adrs, uint8_t pwm_num, uint16_t clk_div, uint16_t pwm_freq, uint16_t pwm_duty, bool polarity);
+      uint8_t update_PWM(uint8_t iox_adrs, uint8_t pwm_num, uint16_t pwm_duty);
 
       /** ADC functions **/
-      uint_least8_t config_ADC(uint16_t adc_chnls, uint8_t adc_resol);	 // config one or more gpio's for ADC input
-      uint8_t start_ADC(uint16_t adc_chnls, uint16_t num_samples);
-      uint8_t read_ADC(uint8_t adc_chnl, ADC_CONVERT *adc_conv);
+      uint_least8_t config_ADC(uint8_t iox_adrs, uint16_t adc_chnls, uint8_t adc_resol);	 // config one or more gpio's for ADC input
+      uint8_t start_ADC(uint8_t iox_adrs, uint16_t adc_chnls, uint16_t num_samples);
+      uint8_t read_ADC(uint8_t iox_adrs, uint8_t adc_chnl, ADC_CONVERT *adc_conv);
       int8_t find_first_adc(uint16_t adc_chnls);
 
       /** Timer Input Capture functions **/
-      uint8_t start_capture(uint8_t capt_chnl, uint8_t trig_edge, uint8_t capt_type);
-      uint32_t read_capture(uint8_t capt_chnl);
+      uint8_t start_capture(uint8_t iox_adrs, uint8_t capt_chnl, uint8_t trig_edge, uint8_t capt_type);
+      uint32_t read_capture(uint8_t iox_adrs, uint8_t capt_chnl);
 
       /** Encoder functions **/
-      uint8_t config_encoder(uint8_t enc_chnl);
-      uint8_t read_encoder(uint8_t enc_chnl, ROT_ENC *rot_enc);
+      uint8_t config_encoder(uint8_t iox_adrs, uint8_t enc_chnl);
+      uint8_t read_encoder(uint8_t iox_adrs, uint8_t enc_chnl, ROT_ENC *rot_enc);
 
       /** Sleep Mode **/
-      uint8_t sleep(uint8_t wake_gpio);
+      uint8_t sleep(uint8_t iox_adrs, uint8_t wake_gpio);
 
 
    private:
-      uint8_t i2c_write(uint8_t regnum, uint8_t *databuf, uint8_t numbytes, bool end_trans = true);
-      uint8_t i2c_read(uint8_t *rcvbuf, uint8_t numbytes);
-      uint8_t _i2c_adrs;
+      uint8_t i2c_write(uint8_t iox_adrs, uint8_t regnum, uint8_t *databuf, uint8_t numbytes, bool end_trans = true);
+      uint8_t i2c_read(uint8_t iox_adrs, uint8_t *rcvbuf, uint8_t numbytes);
+      uint8_t get_iox_adrs(uint8_t iox_adrs);    // 0 or 1
       uint8_t _last_error;
       TwoWire *_wire;
       uint8_t _rxbufr[MAX_BUFR_SIZE];
