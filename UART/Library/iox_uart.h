@@ -3,7 +3,7 @@
  * @author J.Hoeppner @ Abbycus
  * @brief 
  * @version 1.0
- * @date 2022-09-26
+ * @date 2022-11-11
  * 
  * @copyright Copyright (c) 2022
  * 
@@ -16,7 +16,6 @@
 #include "Wire.h"
 #include "driver/uart.h"
 
-#define SERIAL_SIZE_RX     130
 #define WHOAMI_MAGIC_NUM   0x5D
 #define UART_TIMEOUT       250         // arbitrary bus transaction timeout in milliseconds
 
@@ -43,18 +42,21 @@ enum cmd_nums {
    READ_ENCODER,           // read an encoder 
    SLEEP,                  // enter low power sleep mode
    SET_UART_BAUD,          // sets the UART baudrate (UART IF only)
+   GET_VERSION,            // get bus type & firmware version #
 };
 
+/** Error codes **/
 enum errors {
    ERR_NONE = 0,           // good to go
    ERR_PARAM,              // 1 = bad parameter
    ERR_GP_FAILURE,         // 2 = general failure
-   ERR_WRONG_MODE,         // bus is in wrong mode
-   ERR_TIMEOUT,            // bus timeout
+   ERR_SERIAL_MODE,        // bus is in wrong mode
+   ERR_CMD_TIMEOUT,        // bus timeout
    ERR_SEND,
    ERR_RECV,
 };
 
+/** STATUS byte bit flags **/
 enum status_bits {
 	STATUS_NONE = 0x0,
    STATUS_ERROR = 0x1,
@@ -65,6 +67,7 @@ enum status_bits {
    STATUS_ENCODER = 0x20,
 };
 
+/** field mask for READ STATUS **/
 enum field_mask {
    FIELD_ERROR=0x1,
    FIELD_EXTI=0x2,
@@ -73,11 +76,60 @@ enum field_mask {
    FIELD_ENCODER=0x20,
 };
 
+/** enumerate GPIO pins **/
+enum gpios {
+   GPIO0 = 0,
+   GPIO1,
+   GPIO2,
+   GPIO3,
+   GPIO4,
+   GPIO5,
+   GPIO6,
+   GPIO7,
+   GPIO8,
+   GPIO9,
+   GPIO10,
+   GPIO11,
+   GPIO12,
+   GPIO13,
+   GPIO14,
+   GPIO15,
+   GPIO16,
+   GPIO17,
+   GPIO18,
+   GPIO19,                                                     
+};
+
+enum gpio_bitwise {
+   GPIO0_b = 0x1,
+   GPIO1_b = 0x2,
+   GPIO2_b = 0x4,
+   GPIO3_b = 0x8,
+   GPIO4_b = 0x10,
+   GPIO5_b = 0x20,
+   GPIO6_b = 0x40,
+   GPIO7_b = 0x80,
+   GPIO8_b = 0x100,
+   GPIO9_b = 0x200,
+   GPIO10_b = 0x400,
+   GPIO11_b = 0x800,
+   GPIO12_b = 0x1000,
+   GPIO13_b = 0x2000,
+   GPIO14_b = 0x4000,
+   GPIO15_b = 0x8000,
+   GPIO16_b = 0x10000,
+   GPIO17_b = 0x20000,
+   GPIO18_b = 0x40000,
+   GPIO19_b = 0x80000,
+};
+
+#define WAKE_SERIAL_BUS    0xFF           // wake from sleep when serial bus becomes active
+
+/** misc structures **/
 typedef struct {
    uint8_t status;
    uint16_t field;
 }SYS_STATUS;
-
 
 typedef struct {
    bool dir;
@@ -92,30 +144,15 @@ typedef struct {
    uint16_t samples;
 }ADC_CONVERT;
 
-enum gpio_bitwise {
-   GPIO_0 = 0x1,
-   GPIO_1 = 0x2,
-   GPIO_2 = 0x4,
-   GPIO_3 = 0x8,
-   GPIO_4 = 0x10,
-   GPIO_5 = 0x20,
-   GPIO_6 = 0x40,
-   GPIO_7 = 0x80,
-   GPIO_8 = 0x100,
-   GPIO_9 = 0x200,
-   GPIO_10 = 0x400,
-   GPIO_11 = 0x800,
-   GPIO_12 = 0x1000,
-   GPIO_13 = 0x2000,
-   GPIO_14 = 0x4000,
-   GPIO_15 = 0x8000,
-   GPIO_16 = 0x10000,
-   GPIO_17 = 0x20000,
-   GPIO_18 = 0x40000,
-   GPIO_19 = 0x80000,
-};
+typedef struct {
+   uint8_t reserved;
+   uint8_t bus_version;
+   uint8_t major_rev;
+   uint8_t minor_rev;
+}VERSION_INFO;
 
-/** Basic mode - inout/output **/
+
+/** GPIO modes - inout/output **/
 #define IO_INPUT              0x0
 #define IO_OUTPUT_PP          0x20     // push-pull output drive (normal)
 #define IO_OUTPUT_OD          0x30     // open-drain output (wire-OR applications)
@@ -127,12 +164,12 @@ enum gpio_bitwise {
 #define IO_PULLUP             0x04     // enable pullup 
 #define IO_PULLDOWN           0x08     // enable pulldown
 
-/** i/o speed constants - only applies if the GPIO is an OUTPUT **/
+/** I/O speed constants - only applies if the GPIO is an OUTPUT **/
 #define IO_SPEED_LOW          0x0      // output speed (current drive) 2 MHz
 #define IO_SPEED_MED          0x1      // 10 MHz
 #define IO_SPEED_HIGH         0x3      // 50 MHz
 
-/** i/o EXTI constants - only applies if the GPIO is an INPUT **/
+/** I/O EXTI constants - only applies if the GPIO is an INPUT **/
 #define IO_EXTI_DISABLE       0x0      // exti disabled
 #define IO_EXTI_RISING        0x1      // exti enabled, rising edge trigger
 #define IO_EXTI_FALLING       0x2      // exti enabled, falling edge trigger
@@ -145,7 +182,8 @@ enum gpio_bitwise {
 #define ADC_RESOL_6           6
 
 #define NUM_ADC_CHNLS         10
-enum adc_chnls {
+
+enum adc_bitwise {
    ADC_0 = 0x0001,
    ADC_1 = 0x0002,
    ADC_2 = 0x0004,
@@ -158,7 +196,7 @@ enum adc_chnls {
    ADC_9 = 0x0200,         
 };
 
-/** Inputt Capture constants **/
+/** Input Capture constants **/
 #define INPUT_CAPT_RISING		0
 #define INPUT_CAPT_FALLING		1
 #define INPUT_CAPT_BOTH			5
@@ -185,7 +223,19 @@ enum capt_bitwise {
    CAPT_15 = 0x8000,
 };
 
-#define MAX_BUFR_SIZE         24
+enum enum_encoders {
+   ENC0=0,
+   ENC1,
+   ENC2,
+   ENC3,
+   ENC4,
+   ENC5,
+   ENC6,
+   ENC7,
+};
+
+
+#define MAX_BUFR_SIZE         24    // UART RX & TX buffer size
 
 /** PWM period defines **/
 #define PWM_CLK_500_KHZ		95			// timer clock 2 usec
@@ -219,7 +269,6 @@ enum pwm_bitwise {
    PWM_14 = 0x4000,
    PWM_15 = 0x8000,
 };
-
 
 enum event_types {
    EVENT_NONE=0,                // make sure disabled == 0
@@ -282,6 +331,8 @@ class IOX_UART {
       /** Communications parameters **/
       uint8_t set_uart_baud(uint8_t iox_adrs, uint32_t baudrate);
 
+      /** Version Check **/
+      uint8_t get_version(uint8_t iox_adrs, VERSION_INFO *version);
 
    private:
       uint8_t uart_send(uint8_t *databuf, uint8_t bytes2send);
@@ -294,6 +345,7 @@ class IOX_UART {
       uint8_t _rxbufr[MAX_BUFR_SIZE];
       uint8_t _txbufr[MAX_BUFR_SIZE];
       uint16_t _serialBufSize;
+
 };
 
 

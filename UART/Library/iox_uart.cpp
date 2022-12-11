@@ -3,10 +3,12 @@
  * @author J.Hoeppner @ Abbycus
  * @brief 
  * @version 1.0
- * @date 2022-09-26
+ * @date 2022-11-11
  * 
  * @copyright Copyright (c) 2022
  * 
+ * @note This code uses an ESP32-S3 MPU as the bus master. PlatformIO 
+ *       was used as the IDE with Arduino framework.
  */
 
 #include "iox_uart.h"
@@ -21,7 +23,9 @@ IOX_UART::IOX_UART(void)
 
 
 /********************************************************************
- * @brief Initialize the master UART controller.
+ * @brief Initialize the bus master UART controller. 
+ * 
+ * @note *** The 
  * 
  * @param pin_tx - UART TX pin
  * @param pin_rx - UART RX pin
@@ -63,7 +67,9 @@ bool IOX_UART::init(uint8_t uart_number, uint8_t pin_tx, uint8_t pin_rx, uint32_
 
 
 /********************************************************************
- * @brief set IOX UART baudrate to new value.
+ * @brief Set IOX UART baudrate to new value. Obviously should match 
+ *       the bus master's baud rate.
+ * @note On power up or hard reset the IOX device will default to 115200 baud.
  * 
  * @param iox_adrs - device adrs (0 or 1)
  * @param baudrate - Baudrate in bits/sec. Example: 19200
@@ -77,18 +83,14 @@ uint8_t IOX_UART::set_uart_baud(uint8_t iox_adrs, uint32_t baudrate)
    _txbufr[3] = baudrate & 0xFF;
 
    uint8_t ret = uart_send((uint8_t *)&_txbufr, 4);
-   // if(ret == ERR_NONE)
-   // {
-   //    ret = uart_read((uint8_t *)&_rxbufr, 1);
-   //    ret = (ret == 1) ? ERR_NONE : ERR_GP_FAILURE;
-   // }
+
    return ret;
 }
 
 
 /********************************************************************
- * @brief Who Am I checks the bus connection. The IOX device is 
- *       expected to return a value of 0x5D.
+ * @brief Who Am I validates the bus connection. The IOX device is 
+ *       expected to return a value of 0x5D or 0xDD (ADR0 = 1).
  * @return ERR_NONE if connection is valid.
  */
 uint8_t IOX_UART::whoAmI(uint8_t iox_adrs)   // connection test
@@ -115,9 +117,11 @@ uint8_t IOX_UART::whoAmI(uint8_t iox_adrs)   // connection test
 
 
 /********************************************************************
- * @brief Error Check returns a STATUS byte and an ERROR word reflecting
+ * @brief Read status returns a STATUS byte and an ERROR word reflecting
  *       the status from the last operation.
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param sys_status - pointer to a SYS_STATUS structure - see IOX_UART.h
+ * @param field_mask - requested field to be returned in the FIELD word.
  * 
  * @return ERR_NONE if successful. Otherwise see error codes in IOX_UART.h 
  */
@@ -151,12 +155,22 @@ uint8_t IOX_UART::read_status(uint8_t iox_adrs, SYS_STATUS *sys_status, uint8_t 
 /********************************************************************
  * @brief Configure one or more gpio pins with the same mode info.
  * 
- * @param start - GPIO number to start range. Valid is 0 - 19.
- * @param end - GPIO number to end range. Valid is 'start' - 19.
+ * @param iox_adrs - address of the IOX device (0 or 1)
+ * @param gpio_map - 20 bit map of the GPIOs to be configured. A '1'
+ *       in the associated bit position causes that GPIO to be configured.
  * @param io_mode - Encoded mode, type, pullup, speed, and exti enable.
  * @example 
- *    config_gpios(0, 3, IO_OUTPUT_PP | IO_SPEED_MED)
- *    config_gpios(7, 19, IO_INPUT | IO_PULLUP | IO_EXTI_RISING);
+ *    Configure GPIO0 and GPIO4 to be a push-pull output, medium speed.
+ *    ---------------------------------------------------------------
+ *    config_gpios(0, 0x00000003, IO_OUTPUT_PP | IO_SPEED_MED) 
+ * 
+ *    Configure GPIO5 - GPIO19 as inputs, weak pullup, ext intr rising edge
+ *    ---------------------------------------------------------------
+ *    config_gpios(0, 0b11111111111111100000, IO_INPUT | IO_PULLUP | IO_EXTI_RISING);
+ * 
+ *    Configure GPIO3 & GPIO4 as output, open drain, weak pullup
+ *    ---------------------------------------------------------------
+ *    config_gpios(0, (GPIO3_b | GPIO4_b), IO_OUTPUT_OD | IO_PULLUP);
  * 
  * @return 0 if successful, error code otherwise.
  */
@@ -184,6 +198,7 @@ uint8_t IOX_UART::config_gpios(uint8_t iox_adrs, uint32_t gpio_map, uint8_t io_m
 /********************************************************************
  * @brief Return the IO mode for the specified GPIO.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param gpio_num - Logical GPIO 0 - 19
  * @return 0xFF on error or...
  * GPIO mode encoded as follows:
@@ -240,8 +255,11 @@ uint8_t IOX_UART::get_gpio_config(uint8_t iox_adrs, uint8_t gpio_num)
 /********************************************************************
  * @brief Write one or more gpio's with the same state.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param gpio_map - bitmap of gpio's to write (lower 20 bits).
+ *       A '1' bit flags the associated GPIO to be written.
  * @param state_map - bitmap of states to write (lower 20 bits)
+ *       The bit state to write to the GPIO. 
  * @return ERR_NONE if successful otherwise an error code 
  */
 uint8_t IOX_UART::write_gpios(uint8_t iox_adrs, uint32_t gpio_map, uint32_t state_map)
@@ -270,9 +288,9 @@ uint8_t IOX_UART::write_gpios(uint8_t iox_adrs, uint32_t gpio_map, uint32_t stat
 /********************************************************************
  * @brief Toggle the output state of a range of GPIO's.
  * 
- * @param start - starting GPIO number
- * @param end - ending GPIO number
- * @return true if operation is successful
+ * @param iox_adrs - address of the IOX device (0 or 1)
+ * @param _gpio_map - A '1' bit flags the associated GPIO to be inverted.
+ * @return ERR_NONE if successful otherwise an error code 
  */
 uint8_t IOX_UART::toggle_gpios(uint8_t iox_adrs, uint32_t _gpio_map)
 {
@@ -297,9 +315,10 @@ uint8_t IOX_UART::toggle_gpios(uint8_t iox_adrs, uint32_t _gpio_map)
 /********************************************************************
  * @brief Read the state of the specified GPIO
  * 
- * @param gpio - 0-19
- * @param value is a pointer to a memory location where the return value
- *       is written.
+ * @param iox_adrs - address of the IOX device (0 or 1)
+ * @param gpio_num - 0-19
+ * @param gpio_val is a pointer to an 8 bit memory location where the 
+ *       return value is written to.
  * @return uint8_t - ERR_NONE if successful, otherwise an error code.
  */
 uint8_t IOX_UART::read_gpio(uint8_t iox_adrs, uint8_t gpio_num, uint8_t *gpio_val)   // connection test
@@ -328,6 +347,7 @@ uint8_t IOX_UART::read_gpio(uint8_t iox_adrs, uint8_t gpio_num, uint8_t *gpio_va
 /********************************************************************
  * @brief Read all inputs and return state as a 20 bit field.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param gpio_map - pointer to a 32 bit variable where the 20 
  *       bit map will be written.
  * @return uint8_t - ERR_NONE if succesful, otherwise an error code.
@@ -364,11 +384,13 @@ uint8_t IOX_UART::read_gpio_all(uint8_t iox_adrs, uint32_t *gpio_map)
 /********************************************************************
  * @brief Configure a GPIO to be used as an interrupt alert output pin.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param event_type - type of event to trigger output. Values can be:
  *          EVENT_EXTI, EVENT_ADC, EVENT_CAPTURE, or EVENT_ENCODER.
  * @param event_io - logical gpio output. Valid values are GPIO16 - GPIO19.
  * @note - Any event_io values that are not valid (i.e. 0) will disable the 
  *       event function.
+ * @return uint8_t - ERR_NONE if succesful, otherwise an error code.
  */
 uint8_t IOX_UART::config_event_output(uint8_t iox_adrs, uint8_t event_type, uint8_t event_io)
 {
@@ -393,6 +415,7 @@ uint8_t IOX_UART::config_event_output(uint8_t iox_adrs, uint8_t event_type, uint
  * @brief Configure & Start a PWM output.
  * @note: There are 10 output pins that can function as PWM outputs.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param pwm_num - PWM output. Valid numbers are 0 - 9.
  * @param clk_div - 16 bit value used to set the PWM clock prescale.
  * @param pwm_freq - PWM period frequency = clock speed / pwm_freq
@@ -431,6 +454,7 @@ uint8_t IOX_UART::start_PWM(uint8_t iox_adrs, uint8_t pwm_num, uint16_t clk_div,
 /********************************************************************
  * @brief Update a configured PWM output.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param pwm_num - PWM output to update
  * @param pwm_duty - 16 bit duty cycle value
  * @return ERR_NONE if successful, error code otherwise.
@@ -461,10 +485,11 @@ uint8_t IOX_UART::update_PWM(uint8_t iox_adrs, uint8_t pwm_num, uint16_t pwm_dut
  * @brief Configure one or more ADC channels. This funtion set the ADC
  *       resolution and configures gpio's for analog input.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param adc_chnls - bit-wise map of channels to configure as ADC input.
  *       Each bit from 0 - 9 represents a logical channel.
- * @param adc_resol - 6, 8, 10, or 12 bit resolution applies to all channels
- * @return true if successful
+ * @param adc_resol - 6, 8, 10, or 12 bit resolution - applies to all channels
+ * @return ERR_NONE if successful, error code otherwise.
  */
 uint8_t IOX_UART::config_ADC(uint8_t iox_adrs, uint16_t adc_chnls, uint8_t adc_resol)
 {
@@ -491,6 +516,7 @@ uint8_t IOX_UART::config_ADC(uint8_t iox_adrs, uint16_t adc_chnls, uint8_t adc_r
  * @brief Start an ADC conversion on one or more channels with the 
  *       specified number os samples.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param adc_chnls - bitwise map of channels to convert
  * @param num_samples - number of samples to average over.
  * @return true if successful.
@@ -520,6 +546,7 @@ uint8_t IOX_UART::start_ADC(uint8_t iox_adrs, uint16_t adc_chnls, uint16_t num_s
 /********************************************************************
  * @brief Read result of one ADC channel (0 - 9).
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param adc_num - 0 - 9
  * @param adc_conv - pointer to an ADC_CONVERT structure - see IOX_UART.h
  * @return ERR_NONE if successful, error code otherwise
@@ -598,9 +625,11 @@ int8_t IOX_UART::find_first_adc(uint16_t adc_chnls)
 /********************************************************************
  * @brief Start an Input Capture measurement
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param capt_num - Capture channel number (0-9)
  * @param trig_edge - INPUT_CAPT_RISING, INPUT_CAPT_FALLING, or INPUT_CAPT_BOTH
  * @param cap_type - CAPTURE_TYPE_FREQ or CAPTURE_TYPE_PW
+ * @return ERR_NONE if successful, error code otherwise
  */
 uint8_t IOX_UART::start_capture(uint8_t iox_adrs, uint8_t capt_num, uint8_t trig_edge, uint8_t capt_type)
 {
@@ -626,8 +655,9 @@ uint8_t IOX_UART::start_capture(uint8_t iox_adrs, uint8_t capt_num, uint8_t trig
 /********************************************************************
  * @brief Read capture measurement.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param capt_num - capture channel logical number (0-9)
- * @return uint32_t - 32 bit capture measurement
+ * @return uint32_t - 32 bit capture measurement. Returns 0 on error.
  */
 uint32_t IOX_UART::read_capture(uint8_t iox_adrs, uint8_t capt_num)
 {
@@ -658,8 +688,9 @@ uint32_t IOX_UART::read_capture(uint8_t iox_adrs, uint8_t capt_num)
 
 
 /********************************************************************
- * @brief Configure a pair of inputs for encoder function
+ * @brief Configure a pair of inputs for rotary encoder function.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param enc_num - logical encoder number (0 - 7)
  * @return ERR_NONE if successful, error code otherwise.
  */
@@ -684,6 +715,7 @@ uint8_t IOX_UART::config_encoder(uint8_t iox_adrs, uint8_t enc_num)
 /********************************************************************
  * @brief Return last encoder values.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param enc_num - logical encoder number (0 - 7)
  * @param rot_enc - pointer to a ROT_ENC struct
  * @return ERR_NONE if successful, otherwise an error code.
@@ -722,8 +754,10 @@ uint8_t IOX_UART::read_encoder(uint8_t iox_adrs, uint8_t enc_num, ROT_ENC * rot_
 /********************************************************************
  * @brief Enter sleep mode. Wake on GPIO level change.
  * 
- * @param wake_gpio - gpio number to use as wake up.
- * @note sleep does not return a status byte because it should be sleeping.
+ * @param iox_adrs - address of the IOX device (0 or 1)
+ * @param wake_gpio - gpio number to use as wake up. Valid 0 - 15.
+ *    @note If wake_gpio == 255, the wake condition will be UART RX signal.
+ *    @note sleep does not return a status byte because it should be sleeping.
  * @return uint8_t - ERR_NONE if successful, error code otherwise
  */
 uint8_t IOX_UART::sleep(uint8_t iox_adrs, uint8_t wake_gpio)
@@ -731,6 +765,35 @@ uint8_t IOX_UART::sleep(uint8_t iox_adrs, uint8_t wake_gpio)
    _txbufr[0] = SLEEP | ((iox_adrs > 0) ? 0x80 : 0x0);
    _txbufr[1] = wake_gpio;
    uint8_t ret = uart_send((uint8_t *)&_txbufr, 2);     // send wakeup gpio
+   return ret;
+}
+
+
+/********************************************************************
+ * @brief Return version information to the VERSION_INFO struct
+ * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
+ * @param version - pointer to a VERSION_INFO structure
+ * @return ERR_NONE if successful
+ */
+uint8_t IOX_UART::get_version(uint8_t iox_adrs, VERSION_INFO *version)
+{
+   _txbufr[0] = GET_VERSION | ((iox_adrs > 0) ? 0x80 : 0x0);
+   uint8_t ret = uart_send((uint8_t *)&_txbufr, 1);     // request device version info
+   if(ret == ERR_NONE)
+   {
+      ret = uart_read((uint8_t *)&_rxbufr, 5);
+      if(ret == 5)
+      {
+         version->reserved = _rxbufr[0];
+         version->bus_version = _rxbufr[1];
+         version->major_rev = _rxbufr[2];
+         version->minor_rev = _rxbufr[3];
+         ret = ERR_NONE;
+      }
+      else 
+         ret = ERR_GP_FAILURE;
+   }
    return ret;
 }
 
@@ -749,28 +812,46 @@ uint8_t IOX_UART::sleep(uint8_t iox_adrs, uint8_t wake_gpio)
 uint8_t IOX_UART::uart_send(uint8_t *databuf, uint8_t bytes2send)
 {
    uint8_t cmd = *databuf;             // set MSB of cmd byte with address flag
-   //*databuf = (cmd | _adr0);
+   size_t bytesWritten = 0;
    uint32_t timout = millis();
 
    switch(_uart_num)
    {
       case 0:
          Serial.setTimeout(UART_TIMEOUT);
-         Serial.write(databuf, bytes2send);
+         bytesWritten = Serial.write(databuf, bytes2send);
          break;
 
       case 1:
          Serial1.setTimeout(UART_TIMEOUT);
-         Serial1.write(databuf, bytes2send);
+         bytesWritten = Serial1.write(databuf, bytes2send);
          break;
 
       case 2:
          Serial2.setTimeout(UART_TIMEOUT);
-         Serial2.write(databuf, bytes2send);
+         bytesWritten = Serial2.write(databuf, bytes2send);
          break;                  
 
    }
-   //vTaskDelay(1);
+   if(bytesWritten != bytes2send)
+   {
+      Serial.printf("uart_send write error, requested bytes to send=%d, actual bytes sent=%d\n", bytes2send, bytesWritten);
+      switch(_uart_num)
+      {
+         case 0:
+            Serial.flush();
+            break;
+
+         case 1:
+            Serial1.flush();
+            break;
+
+         case 2:
+            Serial2.flush();
+            break;                        
+      }
+      return ERR_GP_FAILURE;
+   }
    return  ERR_NONE;      
 }
 
@@ -808,9 +889,6 @@ uint8_t IOX_UART::uart_read(uint8_t *rcvbuf, uint8_t bytes2read)
       default:
          return 0;
    }
-
-   // while()
-   //rxBytes = uart_read_bytes(_uart_num, rcvbuf, SERIAL_SIZE_RX, 1);
       
    return (rxBytes & 0xFF);
 }
