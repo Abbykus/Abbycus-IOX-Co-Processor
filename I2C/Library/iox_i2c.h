@@ -41,6 +41,8 @@ enum reg_nums {
    CONFIG_ENCODER,         // configure an encoder input
    READ_ENCODER,           // read an encoder 
    SLEEP,                  // enter low power sleep mode
+   SET_UART_BAUD,          // sets the UART baudrate (UART only, here for compatibility)
+   GET_VERSION,            // return version information
 };
 
 enum gpios {
@@ -66,6 +68,29 @@ enum gpios {
    GPIO19,                                                               
 };
 
+enum gpio_bitwise {
+   GPIO0_b = 0x1,
+   GPIO1_b = 0x2,
+   GPIO2_b = 0x4,
+   GPIO3_b = 0x8,
+   GPIO4_b = 0x10,
+   GPIO5_b = 0x20,
+   GPIO6_b = 0x40,
+   GPIO7_b = 0x80,
+   GPIO8_b = 0x100,
+   GPIO9_b = 0x200,
+   GPIO10_b = 0x400,
+   GPIO11_b = 0x800,
+   GPIO12_b = 0x1000,
+   GPIO13_b = 0x2000,
+   GPIO14_b = 0x4000,
+   GPIO15_b = 0x8000,
+   GPIO16_b = 0x10000,
+   GPIO17_b = 0x20000,
+   GPIO18_b = 0x40000,
+   GPIO19_b = 0x80000,
+};
+
 enum encoders {
    ENC0=0,
    ENC1,
@@ -81,12 +106,13 @@ enum errors {
    ERR_NONE = 0,           // good to go
    ERR_PARAM,              // 1 = bad parameter
    ERR_GP_FAILURE,         // 2 = general failure
-   ERR_SLAVE_MODE,         // i2c bus is in slave mode
-   ERR_TIMEOUT,            // bus timeout
-   ERR_I2C_SEND,
-   ERR_I2C_RECV,
+   ERR_SERIAL_MODE,        // bus is in wrong mode
+   ERR_CMD_TIMEOUT,        // bus timeout
+   ERR_SEND,
+   ERR_RECV,
 };
 
+/** STATUS byte bit flags **/
 enum status_bits {
 	STATUS_NONE = 0x0,
    STATUS_ERROR = 0x1,
@@ -97,6 +123,7 @@ enum status_bits {
    STATUS_ENCODER = 0x20,
 };
 
+/** field mask for READ STATUS **/
 enum field_mask {
    FIELD_ERROR=0x1,
    FIELD_EXTI=0x2,
@@ -123,19 +150,26 @@ typedef struct {
    uint16_t samples;
 }ADC_CONVERT;
 
+typedef struct {
+   uint8_t reserved;
+   uint8_t bus_version;
+   uint8_t major_rev;
+   uint8_t minor_rev;
+}VERSION_INFO;
+
 
 #define NUM_ADC_CHNLS         10
 enum adc_chnls {
-   ADC_BITMAP0 = 0x0001,
-   ADC_BITMAP1 = 0x0002,
-   ADC_BITMAP2 = 0x0004,
-   ADC_BITMAP3 = 0x0008,
-   ADC_BITMAP4 = 0x0010,
-   ADC_BITMAP5 = 0x0020,
-   ADC_BITMAP6 = 0x0040,
-   ADC_BITMAP7 = 0x0080,
-   ADC_BITMAP8 = 0x0100,
-   ADC_BITMAP9 = 0x0200,         
+   ADC0_b = 0x0001,
+   ADC1_b = 0x0002,
+   ADC2_b = 0x0004,
+   ADC3_b = 0x0008,
+   ADC4_b = 0x0010,
+   ADC5_b = 0x0020,
+   ADC6_b = 0x0040,
+   ADC7_b = 0x0080,
+   ADC8_b = 0x0100,
+   ADC9_b = 0x0200,         
 };
 
 /** Basic mode - inout/output **/
@@ -206,7 +240,6 @@ enum event_outputs {
    EVO3,
 };
 
-
 /** IOX_I2C class for communication to the IOX I/O expander **/
 class IOX_I2C {
    public:
@@ -248,6 +281,12 @@ class IOX_I2C {
 
       /** Sleep Mode **/
       uint8_t sleep(uint8_t iox_adrs, uint8_t wake_gpio);
+
+      /** Set UART Baud Rate - supported here for compatibility **/
+      uint8_t set_uart_baud(uint8_t iox_adrs, uint32_t baudrate);
+
+      /** Version Check **/
+      uint8_t get_version(uint8_t iox_adrs, VERSION_INFO *version);      
 
 
    private:

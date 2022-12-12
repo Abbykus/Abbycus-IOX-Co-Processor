@@ -3,7 +3,7 @@
  * @author J.Hoeppner @ ABBYKUS
  * @brief 
  * @version 1.0
- * @date 2022-09-26
+ * @date 2022-11-11
  * 
  * @copyright Copyright (c) 2022
  * 
@@ -39,8 +39,9 @@ bool IOX_I2C::init(uint8_t sda, uint8_t sck, uint32_t bus_freq, TwoWire *wire)
 
 
 /********************************************************************
- * @brief Who Am I checks the I2C bus connection. The slave device is 
+ * @brief Who Am I checks the I2C bus connection. The IOX device is 
  *       expected to return it's own address (0x5D or 0x5E).
+ * @param iox_adrs - IOX device number 0 or 1
  * @return ERR_NONE if connection is valid.
  */
 uint8_t IOX_I2C::whoAmI(uint8_t iox_adrs)   // connection test
@@ -66,7 +67,10 @@ uint8_t IOX_I2C::whoAmI(uint8_t iox_adrs)   // connection test
 /********************************************************************
  * @brief Error Check returns a STATUS byte and an ERROR word reflecting
  *       the status from the last operation.
+ * 
+ * @param iox_adrs - IOX device number 0 or 1
  * @param sys_status - pointer to a SYS_STATUS structure - see iox_i2c.h
+ * @param field_mask - requested field to be returned in the FIELD word.
  * 
  * @return ERR_NONE if successful. Otherwise see error codes in iox_i2c.h 
  */
@@ -102,6 +106,19 @@ uint8_t IOX_I2C::read_status(uint8_t iox_adrs, SYS_STATUS *sys_status, uint8_t f
  * @param gpio_map - 20 bit map, a '1' flags the GPIO to be configured.
  * @param io_mode - Encoded mode, type, pullup, speed, and exti enable.
  * 
+ * @example
+ *    Configure GPIO0 and GPIO4 to be a push-pull output, medium speed.
+ *    ---------------------------------------------------------------
+ *    config_gpios(0, 0x00000003, IO_OUTPUT_PP | IO_SPEED_MED) 
+ * 
+ *    Configure GPIO5 - GPIO19 as inputs, weak pullup, ext intr rising edge
+ *    ---------------------------------------------------------------
+ *    config_gpios(0, 0b11111111111111100000, IO_INPUT | IO_PULLUP | IO_EXTI_RISING);
+ * 
+ *    Configure GPIO3 & GPIO4 as output, open drain, weak pullup
+ *    ---------------------------------------------------------------
+ *    config_gpios(0, (GPIO3_b | GPIO4_b), IO_OUTPUT_OD | IO_PULLUP);
+ * 
  * @return ERR_NONE if successful.
  */
 uint8_t IOX_I2C::config_gpios(uint8_t iox_adrs, uint32_t gpio_map, uint8_t io_mode)
@@ -123,10 +140,10 @@ uint8_t IOX_I2C::config_gpios(uint8_t iox_adrs, uint32_t gpio_map, uint8_t io_mo
 }
 
 
-
 /********************************************************************
  * @brief Return the IO mode for the specified GPIO.
  * 
+ * @param iox_adrs - IOX device number 0 or 1
  * @param gpio_num - Logical GPIO 0 - 19
  * @return GPIO mode encoded as follows:
  * bit: 7 - 6  	5     4     3     2     1    0
@@ -181,9 +198,11 @@ uint8_t IOX_I2C::get_gpio_config(uint8_t iox_adrs, uint8_t gpio_num)
 /********************************************************************
  * @brief Write one or more gpio's with the same state.
  * 
- * @param start - GPIO number to start range. Valid is 0 - 19.
- * @param end - GPIO number to end range. Valid is 'start' - 19.
- * @param state - a 1 or 0 to write to the gpio.
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param gpio_map - bitmap of gpio's to write (lower 20 bits).
+ *       A '1' bit flags the associated GPIO to be written.
+ * @param state_map - bitmap of states to write (lower 20 bits)
+ *       The bit state to write to the GPIO. 
  * @return 0 or error code if bad parameter or bus error.
  */
 uint8_t IOX_I2C::write_gpios(uint8_t iox_adrs, uint32_t gpio_map, uint32_t state_map)
@@ -212,7 +231,7 @@ uint8_t IOX_I2C::write_gpios(uint8_t iox_adrs, uint32_t gpio_map, uint32_t state
  * @brief Toggle the output state of a range of GPIO's.
  * 
  * @param iox_adrs - IOX device address 0 or 1
- * @param gpio_map - 20 bits, a '1' toggles an output
+ * @param _gpio_map - 20 bits, a '1' toggles an output
  * @return ERR_NONE if successful
  */
 uint8_t IOX_I2C::toggle_gpios(uint8_t iox_adrs, uint32_t _gpio_map)
@@ -238,8 +257,8 @@ uint8_t IOX_I2C::toggle_gpios(uint8_t iox_adrs, uint32_t _gpio_map)
  * 
  * @param iox_adrs - IOX device number 0 or 1
  * @param gpio_num - 0-19
- * @param ret_value is a pointer to a memory location where the return value
- *       is written.
+ * @param ret_value is a pointer to an 8-bit memory location where the 
+ *       return value is written.
  * @return uint8_t - ERR_NONE if successful, otherwise an error code.
  */
 uint8_t IOX_I2C::read_gpio(uint8_t iox_adrs, uint8_t gpio_num, uint8_t *ret_value)   // connection test
@@ -267,6 +286,7 @@ uint8_t IOX_I2C::read_gpio(uint8_t iox_adrs, uint8_t gpio_num, uint8_t *ret_valu
 /********************************************************************
  * @brief Read all inputs and return state as a 20 bit field.
  * 
+ * @param iox_adrs - IOX device number 0 or 1
  * @param gpio_map - pointer to a 32 bit variable where the 20 
  *       bit map will be written.
  * @return uint8_t - ERR_NONE if succesful, otherwise an error code.
@@ -301,11 +321,12 @@ uint8_t IOX_I2C::read_gpio_all(uint8_t iox_adrs, uint32_t *gpio_map)
 /********************************************************************
  * @brief Configure a GPIO to be used as an interrupt alert output pin.
  * 
+ * @param iox_adrs - IOX device number 0 or 1
  * @param event_type - type of event to trigger output. Values can be:
  *          EVENT_EXTI, EVENT_ADC, EVENT_CAPTURE, or EVENT_ENCODER.
- * @param event_io - logical gpio output. Valid values are GPIO16 - GPIO19.
- * @note - Any event_io values that are not valid (i.e. 0) will disable the 
- *       event function.
+ * @note Use EVENT_NONE to disable event output.
+ * @param event_io - logical gpio output. Valid values are 0 - 3.
+ * @note Logical event output 0 is GPIO16.
  */
 uint8_t IOX_I2C::config_event_output(uint8_t iox_adrs, uint8_t event_type, uint8_t event_io)
 {
@@ -328,7 +349,8 @@ uint8_t IOX_I2C::config_event_output(uint8_t iox_adrs, uint8_t event_type, uint8
  * @brief Configure & Start a PWM output.
  * @note: There are 10 output pins that can function as PWM outputs.
  * 
- * @param pwm_num - PWM output. Valid numbers are 0 - 9.
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param pwm_num - Logical PWM outputs. Valid numbers are 0 - 9.
  * @param clk_div - 16 bit value used to set the PWM clock prescale.
  * @param pwm_freq - PWM period frequency = clock speed / pwm_freq
  * @param pwm_duty - PWM duty cycle (on time) is ratio of pwm_freq / pwm_duty
@@ -365,8 +387,9 @@ uint8_t IOX_I2C::start_PWM(uint8_t iox_adrs, uint8_t pwm_num, uint16_t clk_div, 
 /********************************************************************
  * @brief Update a configured PWM output.
  * 
- * @param pwm_num - PWM output to update
- * @param pwm_duty - 16 bit duty cycle value
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param pwm_num - Logical PWM output to update
+ * @param pwm_duty - 16 bit duty cycle value to update
  * @return ERR_NONE if successful, error code otherwise.
  */
 uint8_t IOX_I2C::update_PWM(uint8_t iox_adrs, uint8_t pwm_num, uint16_t pwm_duty)
@@ -391,9 +414,10 @@ uint8_t IOX_I2C::update_PWM(uint8_t iox_adrs, uint8_t pwm_num, uint16_t pwm_duty
 
 
 /********************************************************************
- * @brief Configure one or more ADC channels. This funtion set the ADC
- *       resolution and configures gpio's for analog input.
+ * @brief Configure one or more ADC channels. This funtion sets the ADC
+ *       resolution and configures one or more gpio's as analog input.
  * 
+ * @param iox_adrs - IOX device number 0 or 1
  * @param adc_chnls - bit-wise map of channels to configure as ADC input.
  *       Each bit from 0 - 9 represents a logical channel.
  * @param adc_resol - 6, 8, 10, or 12 bit resolution applies to all channels
@@ -422,8 +446,9 @@ uint8_t IOX_I2C::config_ADC(uint8_t iox_adrs, uint16_t adc_chnls, uint8_t adc_re
  * @brief Start an ADC conversion on one or more channels with the 
  *       specified number os samples.
  * 
- * @param adc_chnls - bitwise map of channels to convert
- * @param num_samples - number of samples to average over.
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param adc_chnls - bitwise map of channels to convert (lower 10 bits)
+ * @param num_samples - number of samples to average over. Max 65535.
  * @return true if successful.
  */
 uint8_t IOX_I2C::start_ADC(uint8_t iox_adrs, uint16_t adc_chnls, uint16_t num_samples)
@@ -450,7 +475,8 @@ uint8_t IOX_I2C::start_ADC(uint8_t iox_adrs, uint16_t adc_chnls, uint16_t num_sa
 /********************************************************************
  * @brief Read result of one ADC channel (0 - 9).
  * 
- * @param adc_num - 0 - 9
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param adc_num - ADC channel number. Valid numbers are 0 - 9
  * @param adc_conv - pointer to an ADC_CONVERT structure - see iox_i2c.h
  * @return ERR_NONE if successful, error code otherwise
  */
@@ -464,6 +490,7 @@ uint8_t IOX_I2C::read_ADC(uint8_t iox_adrs, uint8_t adc_num, ADC_CONVERT *adc_co
 
    /** load the _txbufr with the adc channel number **/
    _txbufr[0] = adc_num;            // adc chnl 0 - 9
+
    ret = i2c_write(iox_adrs, READ_ADC, (uint8_t *)&_txbufr, 1, false); 
    if(ret == ERR_NONE)
    {
@@ -497,40 +524,13 @@ uint8_t IOX_I2C::read_ADC(uint8_t iox_adrs, uint8_t adc_num, ADC_CONVERT *adc_co
 
 
 /********************************************************************
- * @brief Helper function to convert first bit-wise ADC channel map 
- *       to its logical number.
+ * @brief Configure and start an Input Capture measurement.
  * 
- * @param adc_chnls 
- * @return int8_t - logical adc chnl (0 - 9) or -1 if adc_chnls == 0.
- */
-int8_t IOX_I2C::find_first_adc(uint16_t adc_chnls)
-{
-   uint8_t i;
-   uint16_t j = 0x1;
-   int8_t ret = 0;
-
-   if(adc_chnls == 0)
-      return -1;
-
-   for(i=0; i<NUM_ADC_CHNLS; i++)
-   {
-      if((adc_chnls & j) > 0)
-      {
-         break;
-      }
-      j = j << 1;
-      ret++;
-   }
-   return ret;
-}
-
-
-/********************************************************************
- * @brief Start an Input Capture measurement
- * 
- * @param capt_num - Capture channel number (0-9)
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param capt_num - Logical capture channel number (0 - 9)
  * @param trig_edge - INPUT_CAPT_RISING, INPUT_CAPT_FALLING, or INPUT_CAPT_BOTH
  * @param cap_type - CAPTURE_TYPE_FREQ or CAPTURE_TYPE_PW
+ * @return ERR_NONE if successful, error code otherwise
  */
 uint8_t IOX_I2C::start_capture(uint8_t iox_adrs, uint8_t capt_num, uint8_t trig_edge, uint8_t capt_type)
 {
@@ -555,8 +555,10 @@ uint8_t IOX_I2C::start_capture(uint8_t iox_adrs, uint8_t capt_num, uint8_t trig_
 /********************************************************************
  * @brief Read capture measurement.
  * 
+ * @param iox_adrs - IOX device number 0 or 1
  * @param capt_num - capture channel logical number (0-9)
- * @return uint32_t - 32 bit capture measurement
+ * @return uint32_t - 32 bit capture measurement. Note function returns
+ *       0 on error.
  */
 uint32_t IOX_I2C::read_capture(uint8_t iox_adrs, uint8_t capt_num)
 {
@@ -567,6 +569,7 @@ uint32_t IOX_I2C::read_capture(uint8_t iox_adrs, uint8_t capt_num)
       return 0;
 
    _txbufr[0] = capt_num;
+
    ret = i2c_write(iox_adrs, READ_CAPTURE, (uint8_t *)&_txbufr, 1, false); 
    if(ret == ERR_NONE)
    {
@@ -588,7 +591,8 @@ uint32_t IOX_I2C::read_capture(uint8_t iox_adrs, uint8_t capt_num)
 /********************************************************************
  * @brief Configure a pair of inputs for encoder function
  * 
- * @param enc_num - logical encoder number (0 - 7)
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param enc_num - Logical encoder number (0 - 7)
  * @return ERR_NONE if successful, error code otherwise.
  */
 uint8_t IOX_I2C::config_encoder(uint8_t iox_adrs, uint8_t enc_num)
@@ -610,6 +614,7 @@ uint8_t IOX_I2C::config_encoder(uint8_t iox_adrs, uint8_t enc_num)
 /********************************************************************
  * @brief Return last encoder values.
  * 
+ * @param iox_adrs - IOX device number 0 or 1
  * @param enc_num - logical encoder number (0 - 7)
  * @param rot_enc - pointer to a ROT_ENC struct
  * @return ERR_NONE if successful, otherwise an error code.
@@ -646,8 +651,10 @@ uint8_t IOX_I2C::read_encoder(uint8_t iox_adrs, uint8_t enc_num, ROT_ENC *rot_en
 /********************************************************************
  * @brief Enter sleep mode. Wake on GPIO level change.
  * 
+ * @param iox_adrs - IOX device number 0 or 1
  * @param wake_gpio - gpio number to use as wake up.
- * @return uint8_t - ERR_NONE if successful, error code otherwise
+ * @note If wake_gpio == 255, I2C bus activity will wake from sleep.
+ * @return uint8_t - nothing - IOX should be sleeping!
  */
 uint8_t IOX_I2C::sleep(uint8_t iox_adrs, uint8_t wake_gpio)
 {
@@ -658,6 +665,58 @@ uint8_t IOX_I2C::sleep(uint8_t iox_adrs, uint8_t wake_gpio)
    //    ret = i2c_read(iox_adrs, (uint8_t *)&_rxbufr, 1);
    //    ret = (ret == 1) ? ERR_NONE : ERR_GP_FAILURE;
    // }
+   return ret;
+}
+
+
+/********************************************************************
+ * @brief Set UART baud rate. Supported here for compatibility only.
+ * 
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param baudrate - ignored 
+ * @return ERR_NONE if successful, otherwise an error code.
+ */
+uint8_t IOX_I2C::set_uart_baud(uint8_t iox_adrs, uint32_t baudrate)
+{
+   _txbufr[0] = baudrate >> 16;
+   _txbufr[1] = baudrate >> 8;
+   _txbufr[2] = baudrate & 0xFF;
+
+   uint8_t ret = i2c_write(iox_adrs, SET_UART_BAUD, (uint8_t *)&_txbufr, 3, false); 
+   /** One status byte return is expected. **/
+   if(ret == ERR_NONE)
+   {
+      ret = i2c_read(iox_adrs, (uint8_t *)&_rxbufr, 1);
+      ret = (ret == 1) ? ERR_NONE : ERR_GP_FAILURE;
+   }
+   return ret;
+}
+
+
+/********************************************************************
+ * @brief Return version information to the VERSION_INFO struct
+ * 
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param version - pointer to a VERSION_INFO structure
+ * @return ERR_NONE if successful
+ */
+uint8_t IOX_I2C::get_version(uint8_t iox_adrs, VERSION_INFO *version)
+{
+   uint8_t ret = i2c_write(iox_adrs, GET_VERSION, (uint8_t *)&_txbufr, 0, false); 
+   if(ret == ERR_NONE)
+   {
+      ret = i2c_read(iox_adrs, (uint8_t *)&_rxbufr, 5);
+      if(ret == 5)
+      {
+         version->reserved = _rxbufr[0];
+         version->bus_version = _rxbufr[1];
+         version->major_rev = _rxbufr[2];
+         version->minor_rev = _rxbufr[3];
+         ret = ERR_NONE;
+      }
+      else 
+         ret = ERR_GP_FAILURE;
+   }
    return ret;
 }
 
@@ -674,12 +733,44 @@ uint8_t IOX_I2C::get_iox_adrs(uint8_t iox_adrs)    // 0 or 1
 
 
 /********************************************************************
- * @brief i2c_write - send bytes to slave register.
+ * @brief Helper function to convert first bit-wise ADC channel map 
+ *       to its logical number.
  * 
- * @param regnum - register number
- * @param databuf - ptr to xmit data buffer
- * @param bytes2send - number of bytes to send (not including the register num)
- * @param end_comm - true if no bytes to be received from slave (write only transfer)
+ * @param iox_adrs - IOX device number 0 or 1
+ * @param adc_chnls 
+ * @return int8_t - logical adc chnl (0 - 9) or -1 if adc_chnls == 0.
+ */
+int8_t IOX_I2C::find_first_adc(uint16_t adc_chnls)
+{
+   uint8_t i;
+   uint16_t j = 0x1;
+   int8_t ret = 0;
+
+   if(adc_chnls == 0)
+      return -1;
+
+   for(i=0; i<NUM_ADC_CHNLS; i++)
+   {
+      if((adc_chnls & j) > 0)
+      {
+         break;
+      }
+      j = j << 1;
+      ret++;
+   }
+   return ret;
+}
+
+
+/********************************************************************
+ * @brief i2c_write - send bytes to IOX device.
+ * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
+ * @param regnum - register (command) number
+ * @param databuf - pointer to xmit data buffer
+ * @param bytes2send - number of bytes to send (not including the command byte)
+ * @param end_comm - true if no bytes are to be received from slave - 
+ *       (write only transfer).
  * @return ERR_NONE if successful, else failure error code
  */
 uint8_t IOX_I2C::i2c_write(uint8_t iox_adrs, uint8_t regnum, uint8_t *databuf, uint8_t bytes2send, bool write_only)
@@ -693,7 +784,7 @@ uint8_t IOX_I2C::i2c_write(uint8_t iox_adrs, uint8_t regnum, uint8_t *databuf, u
    }
 
    _wire->beginTransmission(get_iox_adrs(iox_adrs));      // transmit to device ABBY-IOX
-   _wire->write(regnum);                     // send mandatory register address
+   _wire->write(regnum);                     // send mandatory register number (command byte)
    for(i=0; i<bytes2send; i++)
    {
       _wire->write(*databuf++);              // MSB first
@@ -708,6 +799,7 @@ uint8_t IOX_I2C::i2c_write(uint8_t iox_adrs, uint8_t regnum, uint8_t *databuf, u
  * call to i2c_write with write_only = false. This creates a Restart
  * condition to switch from slave read to slave write.
  * 
+ * @param iox_adrs - address of the IOX device (0 or 1)
  * @param rcvbuf - ptr to rcv data bufr
  * @param numbytes - number of expected bytes
  * @return number of bytes read from IOX device. Returns 0 on error.
