@@ -1,5 +1,5 @@
 # ABBY-IOX I/O Co-Processor ![](/Photos/IOX_TOP_VIEW_SMALL.png)
-The IOX module series are low cost / high performance co-processors which greatly enhance microprocessor I/O capability by using one of three high speed serial buses (I2C, UART, and SPI) to access up to 20 independent GPIO's with very significant features such as Pulse Width Modulation (PWM) outputs, digital (Capture) frequency / pulse width measurement, external input event detection, programmable evnt outputs, rotary encoder support, fast analog to digital conversion, etc.
+The IOX module series are low cost / high performance co-processors which greatly enhance microprocessor I/O capability by using one of three high speed serial buses (I2C, UART, and SPI) to access up to 20 independent GPIO's with very significant features such as Pulse Width Modulation (PWM) outputs, digital (Capture) frequency / pulse width measurement, external input event detection, programmable event outputs, rotary encoder support, fast analog to digital conversion, etc.
 
 ## List of Features
 - High speed serial bus options include I2C, UART, and SPI
@@ -24,10 +24,10 @@ The IOX module series are low cost / high performance co-processors which greatl
 The IOX module is a 32 pin 16mm square package that can be mounted on headers, surface mounted to a PCB, or DIY wiring using thru-hole vias around the package.
 
 ## Library Installation
-The IOX module comes with a C++ library to enable the user to quickly add expanded capabilities to a project (see Library folder). Simply add two files into the project's source folder: iox_xxx.h and iox_xxx.cpp.
+A C++ library is available for each serial bus version which enables the user to quickly add expanded capabilities to a project (see Library folder). Simply add two files into the project's source folder: iox_xxx.h and iox_xxx.cpp.
 
 The project should reference the library header file using **"#include iox_xxx.h"**.
-Create a library object specifying the IOX_xxx library. Note that the I2C and UART version allows dual addressing where 2 IOX modules can be connected in parallel to the same bus. The SPI protocol can support more than 2 devices in parallel.
+Create a library object specifying the IOX_xxx library. Note that the I2C and UART versions allows dual addressing where 2 IOX modules can be connected in parallel to the same bus. The SPI version supports more than 2 devices in parallel.
 
 Call the library initialization function to begin communication. The following example works for Arduino / platformIO:
 **iox_xxx.init(.........); (see examples for the IOX module types).
