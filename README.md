@@ -1,4 +1,4 @@
-# ABBY-IOX-Co-Processor ![](/Photos/IOX_TOP_VIEW_SMALL.png)
+# ABBY-IOX I/O Co-Processor ![](/Photos/IOX_TOP_VIEW_SMALL.png)
 The IOX module series are low cost / high performance co-processors which greatly enhance microprocessor I/O capability by using one of three high speed serial buses (I2C, UART, and SPI) to access up to 20 independent GPIO's with very significant features such as Pulse Width Modulation (PWM) outputs, digital (Capture) frequency / pulse width measurement, external input event detection, programmable evnt outputs, rotary encoder support, fast analog to digital conversion, etc.
 
 ## List of Features
